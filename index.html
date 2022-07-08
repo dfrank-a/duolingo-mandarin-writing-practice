@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="https://cdn.polyfill.io/v2/polyfill.min.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" 
+            integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous" />
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" 
+            integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+        <script type="application/javascript" src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.2/dist/hanzi-writer.js"></script>
+        <script type="application/javascript" src="./js/characterdata.js"></script>
+        <style>
+            .nav {
+                height: 100vh;
+                overflow-y: scroll;
+                padding-top: 10px;
+                padding-bottom: 10px;
+            }
+            .hanzi-character svg {
+                border: 2px solid #CCC;
+            }
+            .hanzi-col {
+                padding-top: 2em;
+            }
+        </style>
+        <script type="application/javascript">
+            $(document).ready(() => {
+                var timeouts = [];
+                var $unitAccordion = $("#unitAccordion");
+                var $unitTemplate = $("#unitTemplate");
+                var $lessonTemplate = $("#lessonTemplate");
+                var $hanziContainer = $("#hanziContainer");
+
+                $.each(units, function(index) {
+                    var unitId = index + 1;
+                    var unitData = this;
+                    
+                    var $unitAccordionItem = $($unitTemplate.html().replace(/\{0\}/g, unitId));
+                    var $lessonAccordionPartial = $($lessonTemplate.html().replace(/\{0\}/g, unitId));
+
+                    var $lessonAccordion = $unitAccordionItem.find(".lesson-accordion");
+
+                    $.each(unitData.lessons, function(index) {
+                        var lessonId = index + 1;
+                        var lessonData = this;
+                        
+                       
+                        $lessonAccordionItem = $($lessonAccordionPartial.html().replace(/\{1\}/g, lessonId));
+                        $lessonAccordionItem.find(".lesson-name").text(lessonData.name);
+                        $phraseList = $lessonAccordionItem.find(".hanzi-list")
+
+                        $.each(lessonData.phrases, function(index) {
+                            var phraseIndex = index + 1;
+                            var phraseData = this;
+
+                            var $phraseItem = $(`
+                            <li id="phrase${phraseData.id}">
+                                <button class="button button-sm phrase-button">
+                                <span class="simplified-hanzi">${phraseData.simplified.join("")}</span>
+                                <span class="traditional-hanzi" hidden>${phraseData.traditional.join("")}</span>
+                                <span class="pinyin">${phraseData.pinyin}</span>
+                                </button>
+                            </li>
+                            `);
+                            $phraseItem.find('button').data('phraseData', phraseData);
+                            $phraseList.append($phraseItem);
+                        });
+                        
+                        $lessonAccordion.append($lessonAccordionItem);
+                    });
+
+                    $unitAccordion.append($unitAccordionItem);
+                });
+
+                $unitAccordion.on('click', '.phrase-button', function() {
+                    var phraseData = $(this).data('phraseData');
+                    var animations = []
+                    
+
+                    $("#pinyinContainer").text(phraseData.pinyin);
+
+                    $hanziContainer.children().remove();
+
+                    for(var i = 0; i<phraseData.simplified.length; i++){
+                        var hanziId = `hanzi${i}`;
+                        var $currentHanzi = $(`
+                        <div class="col col-lg-2 hanzi-character">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" id=${hanziId}>
+                                <line x1="0" y1="0" x2="200" y2="200" stroke="#EEE" />
+                                <line x1="0" y1="200" x2="200" y2="0" stroke="#EEE" />
+                                <line x1="100" y1="0" x2="100" y2="200" stroke="#DDD" />
+                                <line x1="0" y1="100" x2="200" y2="100" stroke="#DDD" />
+                            </svg>
+                        </div>`);
+
+                        $hanziContainer.append($currentHanzi);
+
+                        animations.push(
+                            HanziWriter.create(
+                                hanziId, 
+                                phraseData.simplified[i], 
+                                {
+                                    width: 200,
+                                    height: 200,
+                                    padding: 5,
+                                    radicalColor: '#168F16',
+                                    showCharacter: false
+                                }
+                            )
+                        );
+                    }
+                    
+                    var loops = 0;
+                    
+                    function animationChain(_animations) {
+                        var first = _animations[0];
+                        var rest = _animations.slice(1);
+
+                        if (rest.length == 0) {
+                            return () => {
+                                first.animateCharacter({
+                                    'onComplete': () => {
+                                        loops++;
+                                        $.each(animations, (index) => {animations[index].hideCharacter();});
+
+                                        setTimeout(animationChain(animations), 1500);
+                                    }
+                                });
+                            };
+                        }
+
+                        return function() {
+                            first.animateCharacter({
+                                'onComplete': () => {
+                                    setTimeout(animationChain(rest), 1500);
+                                },
+                            })
+                        }
+                    }
+
+                    animationChain(animations)();
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col col-md-3">
+                    <div class="row nav">
+                        <div class="accordion" id="unitAccordion"></div>
+                    </div>
+                </div>
+                <div class="col hanzi-col">
+                    <div class="row justify-content-md-center" id="hanziContainer">
+                    </div>
+                    <div class="row justify-content-md-center">
+                        <div class="col col-md-auto" center-block">
+                            <h1 id="pinyinContainer"></h1>
+                        </div>
+                    </div>
+                </div> 
+            </div> 
+        </div>
+        
+        <template id="unitTemplate">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="unit{0}Heading">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" 
+                        data-bs-target="#unit{0}" aria-expanded="false" aria-controls="unit{0}">
+                    Unit {0}
+                    </button>
+                </h2>
+                <div id="unit{0}" class="accordion-collapse collapse" aria-labelledby="unit{0}Heading" data-bs-parent="#unitAccordion">
+                    <div class="accordion-body">
+                        <div class="accordion lesson-accordion" id="unit{0}LessonAccordion">
+                            <!--Lesson accordion goes here-->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <template id="lessonTemplate">
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="unit{0}Lesson{1}Heading">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" 
+                        data-bs-target="#unit{0}Lesson{1}" aria-expanded="false" aria-controls="unit{0}Lesson{1}"
+                    >
+                    Lesson {1}: &nbsp;<span class="lesson-name"></span>
+                    </button>
+                </h3>
+                <div id="unit{0}Lesson{1}" class="accordion-collapse collapse" aria-labelledby="unit{0}Lesson{1}Heading" 
+                    data-bs-parent="#unit{0}LessonAccordion">
+                    <div class="accordion-body">
+                        <ol class="hanzi-list">
+
+                        </ol>                               
+                    </div>
+                </div>
+            </div>
+        </template>
+    </body>
+</html>
